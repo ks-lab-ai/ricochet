@@ -33,6 +33,31 @@ Ricochet s'ajoute à l'ouverture de session, car il doit tourner pour recevoir l
 
 Prenez l'habitude de regarder avant de lancer : le prompt s'exécute avec votre compte Claude, vos connecteurs et vos réglages. L'app Claude affiche elle-même un avertissement pour les prompts reçus par lien, et le lancement automatique le fait passer sans que vous le lisiez.
 
+## Utiliser Ricochet depuis Claude (MCP)
+
+Demandez simplement à Claude « envoie à Louis un prompt pour... » ou « où en sont mes prompts ? ». Il faut que l'app Ricochet soit installée et ouverte : le MCP réutilise sa session, aucune clé à configurer.
+
+**Claude Desktop :** ouvrez l'extension depuis le dossier du dépôt, puis cliquez sur Installer.
+
+```bash
+open mcp/ricochet.mcpb
+```
+
+**Claude Code :** depuis le dossier du dépôt (Node 18 ou plus récent).
+
+```bash
+claude mcp add --scope user ricochet -- node "$(pwd)/mcp/server/index.js"
+```
+
+| Outil | Rôle |
+|---|---|
+| `list_team` | Voir les membres de l'équipe |
+| `send_prompt` | Envoyer un prompt à un collègue |
+| `list_sent` | Voir ses envois et leur statut |
+| `list_received` | Voir les prompts reçus en attente |
+
+Aucun outil ne peut lancer ou refuser un prompt, et c'est volontaire : sinon, un prompt reçu pourrait pousser votre Claude à l'accepter tout seul. Ce clic reste le vôtre, dans l'app.
+
 ## Bon à savoir
 
 - **Brouillon :** si une nouvelle conversation de Claude contient déjà du texte, Ricochet refuse de lancer pour ne rien mélanger. Effacez ou envoyez ce texte, puis réessayez.
