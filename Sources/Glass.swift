@@ -31,12 +31,13 @@ extension View {
         if #available(macOS 15.0, *) { pointerStyle(.link) } else { self }
     }
 
-    /// Fond d'une fenêtre entière.
-    func glassWindow() -> some View {
+    /// Fond d'une fenêtre entière. `dim` : opacité du voile noir posé sur le flou.
+    func glassWindow(dim: CGFloat = 0.58) -> some View {
         background {
             ZStack {
                 VisualEffect()
-                Color.black.opacity(0.68)
+                Color.black.opacity(dim)
+                DragHandle()
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -76,28 +77,34 @@ struct GlassHeader<Trailing: View>: View {
     }
 }
 
-/// Petit bouton carré à icône.
+/// Petit bouton carré à icône, discret ou plein (orange, icône blanche en gras).
 struct SquareButton: View {
     let icon: String
+    var filled = false
     let action: () -> Void
     @State private var hover = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white.opacity(hover ? 0.95 : 0.7))
+                .font(.system(size: filled ? 13 : 11, weight: filled ? .heavy : .bold))
+                .foregroundStyle(filled ? Color.white : Color.white.opacity(hover ? 0.95 : 0.7))
                 .frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(.white.opacity(hover ? 0.14 : 0.07)))
+                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(background))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .handCursor()
     }
+
+    private var background: Color {
+        if filled { return Glass.accent.opacity(hover ? 0.85 : 1) }
+        return Color.white.opacity(hover ? 0.14 : 0.07)
+    }
 }
 
-/// Bouton plein (vert) pour l'action principale, ou discret pour les autres.
+/// Bouton plein (orange) pour l'action principale, ou discret pour les autres.
 struct GlassButton: ButtonStyle {
     var primary = false
     @Environment(\.isEnabled) private var enabled
@@ -170,43 +177,139 @@ struct StatusTag: View {
     }
 }
 
-/// Fenêtre sans bordure ni titre, entièrement dessinée par SwiftUI.
+/// Fenêtre sans bordure ni titre, entièrement dessinée par SwiftUI et déplaçable par son fond.
 final class GlassPanel: NSPanel, NSWindowDelegate {
-    /// Se ferme dès qu'on clique ailleurs (fenêtre de la barre de menus).
+    /// Se ferme dès qu'on clique ailleurs (fenêtre de la barre de menus), tant qu'on ne l'a pas déplacée.
     var closesOnResign = false
     /// Coin haut gauche à conserver quand la hauteur change.
     var anchorTop: NSPoint?
+    /// Vrai pour le widget : se cale sur la grille au lâcher.
+    var snapsToGrid = false
+    /// Clé sous laquelle mémoriser la taille choisie par l'utilisateur.
+    var sizeKey: String?
+    /// Vrai pendant un glisser de la poignée.
+    var gripResizing = false
+    private var placing = false
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
-    convenience init<V: View>(root: V, movable: Bool = true) {
+    convenience init<V: View>(root: V, resizable: Bool = false) {
+        var mask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel, .fullSizeContentView]
+        if resizable { mask.insert(.resizable) }
         self.init(contentRect: NSRect(x: 0, y: 0, width: 340, height: 300),
-                  styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
-                  backing: .buffered, defer: false)
+                  styleMask: mask, backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
         level = .floating
-        isMovableByWindowBackground = movable
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         appearance = NSAppearance(named: .darkAqua)
         collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         delegate = self
-        contentView = FirstMouseHostingView(rootView: root)
+        let host = FirstMouseHostingView(rootView: root)
+        // Redimensionnable : la vue impose seulement sa taille minimale, c'est l'utilisateur qui choisit.
+        if resizable { host.sizingOptions = [.minSize] }
+        contentView = host
+    }
+
+    /// Applique la taille mémorisée, ou la taille par défaut.
+    func restoreSize(default size: NSSize) {
+        var target = size
+        if let sizeKey, let saved = UserDefaults.standard.string(forKey: sizeKey) {
+            let z = NSSizeFromString(saved)
+            if z.width > 0, z.height > 0 { target = z }
+        }
+        setContentSize(target)
+    }
+
+    /// Fin d'un redimensionnement : mémorise la taille et le nouveau coin haut gauche.
+    func finishResize() {
+        if anchorTop != nil { anchorTop = NSPoint(x: frame.minX, y: frame.maxY) }
+        if let sizeKey { UserDefaults.standard.set(NSStringFromSize(frame.size), forKey: sizeKey) }
+        invalidateShadow()
+    }
+
+    /// Place la fenêtre par programme, sans la considérer comme déplacée par l'utilisateur.
+    func place(top: NSPoint) {
+        placing = true
+        anchorTop = top
+        setFrameTopLeftPoint(top)
+        placing = false
     }
 
     func windowDidResignKey(_ notification: Notification) {
         if closesOnResign { orderOut(nil) }
     }
 
+    func windowDidEndLiveResize(_ notification: Notification) { finishResize() }
+
+    func windowDidMove(_ notification: Notification) {
+        guard !placing, !gripResizing, !inLiveResize, anchorTop != nil else { return }
+        anchorTop = NSPoint(x: frame.minX, y: frame.maxY)
+        closesOnResign = false
+    }
+
     func windowDidResize(_ notification: Notification) {
-        if let anchorTop { setFrameTopLeftPoint(anchorTop) }
+        if !inLiveResize, !gripResizing, let anchorTop { place(top: anchorTop) }
         invalidateShadow()
     }
 
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+}
+
+/// Poignée de redimensionnement, en bas à droite d'une fenêtre.
+final class ResizeGripView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func resetCursorRects() {
+        if #available(macOS 15.0, *) {
+            addCursorRect(bounds, cursor: .frameResize(position: .bottomRight, directions: .all))
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let panel = window as? GlassPanel else { return }
+        let start = NSEvent.mouseLocation
+        let frame = panel.frame
+        panel.gripResizing = true
+        defer {
+            panel.gripResizing = false
+            panel.finishResize()
+        }
+        while let e = panel.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]), e.type == .leftMouseDragged {
+            let now = NSEvent.mouseLocation
+            let width = frame.width + now.x - start.x
+            let height = frame.height + start.y - now.y
+            // Le coin haut gauche reste fixe. La taille minimale vient du contenu.
+            panel.setFrame(NSRect(x: frame.minX, y: frame.maxY - height, width: width, height: height), display: true)
+            if panel.frame.height != height {
+                panel.setFrameTopLeftPoint(NSPoint(x: frame.minX, y: frame.maxY))
+            }
+        }
+    }
+}
+
+struct ResizeGrip: View {
+    private struct Handle: NSViewRepresentable {
+        func makeNSView(context: Context) -> ResizeGripView { ResizeGripView() }
+        func updateNSView(_ nsView: ResizeGripView, context: Context) {}
+    }
+
+    var body: some View {
+        Canvas { ctx, size in
+            for inset in [CGFloat(4), 8] {
+                var line = Path()
+                line.move(to: CGPoint(x: size.width - 4, y: inset))
+                line.addLine(to: CGPoint(x: inset, y: size.height - 4))
+                ctx.stroke(line, with: .color(.white.opacity(0.32)), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+            }
+        }
+        .frame(width: 18, height: 18)
+        .background(Handle())
+        .padding(4)
+    }
 }
 
 /// Icône de la barre de menus : l'étoile et ses filets de vitesse, teintée par macOS.

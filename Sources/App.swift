@@ -103,7 +103,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let w = GlassPanel(root: DesktopWidgetView(
             store: store,
             onCompose: { [weak self] in self?.showMain() },
-            onReview: { [weak self] id in self?.review(id) }), movable: false)
+            onReview: { [weak self] id in self?.review(id) }))
+        w.snapsToGrid = true
         w.level = WidgetGrid.level
         w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         w.setContentSize(size)
@@ -165,17 +166,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     self?.mainPanel?.orderOut(nil)
                     self?.review(id)
                 },
-                onClose: { [weak self] in self?.mainPanel?.orderOut(nil) }), movable: false)
-            w.closesOnResign = true
+                onClose: { [weak self] in self?.mainPanel?.orderOut(nil) }), resizable: true)
+            w.sizeKey = "mainPanelSize"
+            w.restoreSize(default: NSSize(width: 360, height: 400))
             mainPanel = w
         }
-        if let button = statusItem?.button, let bw = button.window {
-            let r = bw.convertToScreen(button.convert(button.bounds, to: nil))
-            let screen = bw.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? r
-            let x = min(max(r.midX - 180, screen.minX + 8), screen.maxX - 368)
-            let top = NSPoint(x: x, y: r.minY - 6)
-            w.anchorTop = top
-            w.setFrameTopLeftPoint(top)
+        // Déjà ouverte (et peut-être déplacée) : on la ramène devant sans la bouger.
+        if !w.isVisible {
+            w.closesOnResign = true
+            if let button = statusItem?.button, let bw = button.window {
+                let r = bw.convertToScreen(button.convert(button.bounds, to: nil))
+                let screen = bw.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? r
+                let x = min(max(r.midX - w.frame.width / 2, screen.minX + 8), screen.maxX - w.frame.width - 8)
+                w.place(top: NSPoint(x: x, y: r.minY - 6))
+            }
         }
         NSApp.activate(ignoringOtherApps: true)
         w.makeKeyAndOrderFront(nil)
@@ -190,11 +194,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         Task {
             if store.prompt(id) == nil { await store.refresh() }
-            let panel = GlassPanel(root: ReviewView(store: store, promptID: id) { [weak self] in
+            let panel = GlassPanel(root: ReviewView(store: store, promptID: id, onClose: { [weak self] in
                 self?.reviewPanels[id]?.orderOut(nil)
                 self?.reviewPanels[id] = nil
-            })
-            panel.setContentSize(NSSize(width: 460, height: 380))
+            }), resizable: true)
+            panel.sizeKey = "reviewPanelSize"
+            panel.restoreSize(default: NSSize(width: 460, height: 380))
             panel.center()
             reviewPanels[id] = panel
             NSApp.activate(ignoringOtherApps: true)

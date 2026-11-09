@@ -98,10 +98,15 @@ enum WidgetGrid {
     }
 }
 
-/// Zone de prise du widget, placée sous son contenu.
+/// Zone de prise pour déplacer une fenêtre, placée sous son contenu.
 final class DragHandleView: NSView {
     override func mouseDown(with event: NSEvent) {
-        if let window { WidgetGrid.beginDrag(window, event: event) }
+        guard let window else { return }
+        if (window as? GlassPanel)?.snapsToGrid == true {
+            WidgetGrid.beginDrag(window, event: event)
+        } else {
+            window.performDrag(with: event)
+        }
     }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

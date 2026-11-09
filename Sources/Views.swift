@@ -123,7 +123,7 @@ struct MainView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .frame(height: 120)
+            .frame(minHeight: 110, maxHeight: .infinity)
             .glassField()
 
             HStack(spacing: 8) {
@@ -175,8 +175,8 @@ struct MainView: View {
             }
         }
         .padding(18)
-        .frame(width: 360)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay(alignment: .bottomTrailing) { ResizeGrip() }
         .glassWindow()
         .onReceive(tick) { _ in trusted = AXIsProcessTrusted() }
     }
@@ -246,7 +246,8 @@ struct ReviewView: View {
             }
         }
         .padding(18)
-        .frame(width: 460, height: 380)
+        .frame(minWidth: 380, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity)
+        .overlay(alignment: .bottomTrailing) { ResizeGrip() }
         .glassWindow()
     }
 }
@@ -264,7 +265,7 @@ struct DesktopWidgetView: View {
                 if !store.pending.isEmpty {
                     StatusTag(text: "\(store.pending.count) à traiter", color: Glass.orange)
                 }
-                SquareButton(icon: "square.and.pencil", action: onCompose)
+                SquareButton(icon: "plus", filled: true, action: onCompose)
             }
             if store.pending.isEmpty {
                 VStack(spacing: 6) {
@@ -297,7 +298,6 @@ struct DesktopWidgetView: View {
         }
         .padding(18)
         .frame(width: 320, height: 220)
-        .background(DragHandle())
-        .glassWindow()
+        .glassWindow(dim: 0.68)
     }
 }
