@@ -65,6 +65,8 @@ struct MainView: View {
     @ObservedObject var store: Store
     var onReview: (String) -> Void
     var onClose: () -> Void
+    var onShowWidget: () -> Void = {}
+    @AppStorage("widgetHidden") private var widgetHidden = false
     @State private var recipient: Member?
     /// Dernier mode choisi, gardé d'un envoi à l'autre
     @AppStorage("mode") private var mode: PromptMode = .chat
@@ -171,6 +173,13 @@ struct MainView: View {
             }
 
             HStack {
+                if widgetHidden {
+                    Button("Afficher le widget sur le bureau", action: onShowWidget)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Glass.orange)
+                        .handCursor()
+                }
                 Spacer()
                 Button("Quitter Ricochet") { NSApp.terminate(nil) }
                     .buttonStyle(.plain)
@@ -274,18 +283,75 @@ struct ModeTag: View {
 
 // MARK: Widget de bureau
 
+/// Pastilles rouge et jaune façon macOS : le symbole apparaît au survol du groupe
+struct TrafficLights: View {
+    var onClose: () -> Void
+    var onMinimize: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            light(Color(red: 1, green: 0.373, blue: 0.341), symbol: "xmark", label: "Fermer le widget", action: onClose)
+            light(Color(red: 0.996, green: 0.737, blue: 0.180), symbol: "minus", label: "Réduire le widget", action: onMinimize)
+        }
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hover = h } }
+        .help("Masque le widget. Ricochet continue de tourner et les notifications arrivent toujours.")
+    }
+
+    private func light(_ color: Color, symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(color)
+                Circle().stroke(.black.opacity(0.18), lineWidth: 0.5)
+                Image(systemName: symbol)
+                    .font(.system(size: 7.5, weight: .black))
+                    .foregroundStyle(.black.opacity(0.55))
+                    .opacity(hover ? 1 : 0)
+            }
+            .frame(width: 12, height: 12)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .handCursor()
+        .accessibilityLabel(label)
+    }
+}
+
 struct DesktopWidgetView: View {
     @ObservedObject var store: Store
     var onCompose: () -> Void
     var onReview: (String) -> Void
+    var onHide: () -> Void = {}
+
+    static let baseSize = CGSize(width: 320, height: 220)
 
     var body: some View {
+        // Contenu dessiné à sa taille de référence puis mis à l'échelle de la fenêtre :
+        // tout grandit ensemble, et la place en plus dans l'autre sens est occupée par la liste.
+        GeometryReader { g in
+            let b = Self.baseSize
+            let s = min(max(min(g.size.width / b.width, g.size.height / b.height), 0.8), 2.5)
+            content
+                .padding(18)
+                .frame(width: g.size.width / s, height: g.size.height / s, alignment: .topLeading)
+                .scaleEffect(s, anchor: .topLeading)
+                .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+        }
+        .frame(minWidth: Self.baseSize.width * 0.8, minHeight: Self.baseSize.height * 0.8)
+        .overlay(alignment: .bottomTrailing) { ResizeGrip() }
+        .glassWindow(dim: 0.68)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
-            GlassHeader(title: "Ricochet") {
+            HStack(spacing: 10) {
+                TrafficLights(onClose: onHide, onMinimize: onHide)
+                GlassHeader(title: "Ricochet") {
                 if !store.pending.isEmpty {
                     StatusTag(text: "\(store.pending.count) à traiter", color: Glass.orange)
                 }
-                SquareButton(icon: "plus", filled: true, action: onCompose)
+                    SquareButton(icon: "plus", filled: true, action: onCompose)
+                }
             }
             if store.pending.isEmpty {
                 VStack(spacing: 6) {
@@ -316,8 +382,5 @@ struct DesktopWidgetView: View {
                 .scrollIndicators(.never)
             }
         }
-        .padding(18)
-        .frame(width: 320, height: 220)
-        .glassWindow(dim: 0.68)
     }
 }

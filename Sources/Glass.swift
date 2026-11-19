@@ -229,6 +229,8 @@ final class GlassPanel: NSPanel, NSWindowDelegate {
         if anchorTop != nil { anchorTop = NSPoint(x: frame.minX, y: frame.maxY) }
         if let sizeKey { UserDefaults.standard.set(NSStringFromSize(frame.size), forKey: sizeKey) }
         invalidateShadow()
+        // Widget du bureau : il se recale sur la grille et contre ses voisins
+        if snapsToGrid { WidgetGrid.settle(self, animated: true) }
     }
 
     /// Place la fenêtre par programme, sans la considérer comme déplacée par l'utilisateur.

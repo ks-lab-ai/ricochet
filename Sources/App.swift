@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let item = NSMenuItem(title: "Édition", action: nil, keyEquivalent: "")
         item.submenu = edit
         let appMenu = NSMenu(title: "Ricochet")
+        appMenu.addItem(withTitle: "Afficher le widget sur le bureau", action: #selector(revealDesktopWidget), keyEquivalent: "")
         appMenu.addItem(withTitle: "Masquer Ricochet", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quitter Ricochet", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -99,19 +100,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @MainActor
     private func showDesktopWidget() {
         if desktopWidget != nil { return }
-        let size = NSSize(width: 320, height: 220)
         let w = GlassPanel(root: DesktopWidgetView(
             store: store,
             onCompose: { [weak self] in self?.showMain() },
-            onReview: { [weak self] id in self?.review(id) }))
+            onReview: { [weak self] id in self?.review(id) },
+            onHide: { [weak self] in self?.hideDesktopWidget() }), resizable: true)
         w.snapsToGrid = true
         w.level = WidgetGrid.level
         w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
-        w.setContentSize(size)
-        w.setFrameOrigin(WidgetGrid.initialOrigin(for: w, size: size))
+        let base = DesktopWidgetView.baseSize
+        w.minSize = NSSize(width: base.width * 0.8, height: base.height * 0.8)
+        w.maxSize = NSSize(width: base.width * 2.5, height: base.height * 2.5)
+        w.sizeKey = "widgetSize"
+        w.restoreSize(default: base)
+        w.setFrameOrigin(WidgetGrid.initialOrigin(for: w, size: w.frame.size))
         desktopWidget = w
+        // Masqué par la pastille rouge ou jaune : il reste masqué d'un lancement à l'autre
+        guard !UserDefaults.standard.bool(forKey: "widgetHidden") else { return }
         w.orderFrontRegardless()
         WidgetGrid.settle(w, animated: false)
+    }
+
+    /// Masque seulement le widget : l'app, le temps réel et les notifications continuent.
+    @MainActor
+    private func hideDesktopWidget() {
+        UserDefaults.standard.set(true, forKey: "widgetHidden")
+        guard let w = desktopWidget else { return }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.18
+            w.animator().alphaValue = 0
+        }, completionHandler: {
+            w.orderOut(nil)
+            w.alphaValue = 1
+        })
+    }
+
+    @MainActor @objc private func revealDesktopWidget() {
+        UserDefaults.standard.set(false, forKey: "widgetHidden")
+        if desktopWidget == nil { showDesktopWidget() }
+        guard let w = desktopWidget else { return }
+        w.alphaValue = 0
+        w.orderFrontRegardless()
+        WidgetGrid.settle(w, animated: false)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.2
+            w.animator().alphaValue = 1
+        }
     }
 
     @MainActor
@@ -166,7 +200,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     self?.mainPanel?.orderOut(nil)
                     self?.review(id)
                 },
-                onClose: { [weak self] in self?.mainPanel?.orderOut(nil) }), resizable: true)
+                onClose: { [weak self] in self?.mainPanel?.orderOut(nil) },
+                onShowWidget: { [weak self] in self?.revealDesktopWidget() }), resizable: true)
             w.sizeKey = "mainPanelSize"
             w.restoreSize(default: NSSize(width: 360, height: 400))
             mainPanel = w

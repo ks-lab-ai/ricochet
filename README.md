@@ -20,7 +20,7 @@ Le script compile l'app sur votre Mac et l'installe dans `/Applications`.
 1. **Rejoindre l'équipe :** choisissez votre prénom et collez le code d'équipe donné par Noé. Le code n'est jamais dans ce dépôt, ne le publiez pas.
 2. **Autorisations :** les demandes de macOS s'ouvrent toutes seules. Acceptez les notifications, puis activez Ricochet dans Accessibilité : c'est ce qui permet de cliquer sur « Envoyer » dans Claude.
 3. **Notifications :** pour garder les boutons à l'écran, choisissez le style « Alertes » dans Réglages Système > Notifications > Ricochet.
-4. **Widget :** il apparaît sur votre bureau, sous les autres fenêtres. Faites-le glisser où vous voulez : il se cale sur une grille et s'aimante aux bords de l'écran et à vos autres widgets.
+4. **Widget :** il apparaît sur votre bureau, sous les autres fenêtres. Faites-le glisser où vous voulez : il se cale sur une grille et s'aimante aux bords de l'écran et à vos autres widgets. Redimensionnez-le par ses bords ou sa poignée en bas à droite. Les pastilles rouge et jaune le masquent seulement : Ricochet continue de tourner et les notifications arrivent toujours. Pour le réafficher, cliquez sur l'étoile de la barre de menus, puis sur « Afficher le widget sur le bureau ».
 
 Si l'autorisation Accessibilité manque au moment de lancer un prompt, les réglages s'ouvrent : activez Ricochet et le prompt part tout seul.
 
