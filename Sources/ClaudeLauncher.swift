@@ -11,7 +11,7 @@ enum LaunchError: LocalizedError {
         case .noComposer:
             return "Claude ne répond pas : vérifiez que l'app est ouverte et connectée, puis réessayez."
         case .draft:
-            return "Un brouillon est déjà présent dans une nouvelle conversation de Claude. Envoyez-le ou effacez-le, puis réessayez."
+            return "Un brouillon est déjà présent dans une nouvelle conversation (ou session Code) de Claude. Envoyez-le ou effacez-le, puis réessayez."
         case .mismatch:
             return "Le champ de Claude ne contient pas exactement le prompt, rien n'a été envoyé. Effacez le texte du champ, puis réessayez."
         case .notSent:
@@ -20,9 +20,11 @@ enum LaunchError: LocalizedError {
     }
 }
 
-/// Lance un prompt dans une nouvelle conversation de Claude Desktop.
-/// 1) Lien claude://claude.ai/new?q=… qui ouvre l'app et pré-remplit le champ.
-/// 2) Lecture du champ via l'Accessibilité : on n'envoie que si la page est /new et le contenu exact.
+/// Lance un prompt dans une nouvelle conversation de Claude Desktop, onglet Chat ou onglet Code.
+/// 1) Lien claude://claude.ai/new?q=…&surface=chat (Chat) ou claude://code/new?q=… (Code),
+///    qui ouvre l'app, bascule sur le bon onglet et pré-remplit le champ.
+/// 2) Lecture du champ via l'Accessibilité : on n'envoie que si la page est la bonne
+///    (/new pour Chat, /epitaxy pour une nouvelle session Code) et le contenu exact.
 /// 3) Clic du bouton d'envoi via l'Accessibilité, sans souris, clavier ni presse-papiers.
 /// Ce lien et ce bouton ne sont pas une API documentée : une mise à jour de Claude peut les casser.
 /// Bloquant : à appeler hors du fil principal.
@@ -79,7 +81,10 @@ enum ClaudeLauncher {
         return ""
     }
 
-    private static func isNewChat(_ url: String) -> Bool { URLComponents(string: url)?.path == "/new" }
+    /// Page d'une nouvelle conversation (Chat) ou d'une nouvelle session (Code)
+    private static func isNewPage(_ url: String, _ mode: PromptMode) -> Bool {
+        URLComponents(string: url)?.path == (mode == .code ? "/epitaxy" : "/new")
+    }
 
     private static func sendButton(near composer: AXUIElement) -> AXUIElement? {
         var cur = element(composer, "AXParent")
@@ -97,21 +102,25 @@ enum ClaudeLauncher {
         return nil
     }
 
-    private static func link(for prompt: String) -> URL {
+    private static func link(for prompt: String, mode: PromptMode) -> URL {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "+&=;?/:#")
         var c = URLComponents()
         c.scheme = "claude"
-        c.host = "claude.ai"
         c.path = "/new"
-        c.percentEncodedQueryItems = [
-            URLQueryItem(name: "q", value: prompt.addingPercentEncoding(withAllowedCharacters: allowed)),
-            URLQueryItem(name: "surface", value: "chat"),
-        ]
+        let q = URLQueryItem(name: "q", value: prompt.addingPercentEncoding(withAllowedCharacters: allowed))
+        switch mode {
+        case .chat:
+            c.host = "claude.ai"
+            c.percentEncodedQueryItems = [q, URLQueryItem(name: "surface", value: "chat")]
+        case .code:
+            c.host = "code"
+            c.percentEncodedQueryItems = [q]
+        }
         return c.url!
     }
 
-    static func launch(_ raw: String) throws {
+    static func launch(_ raw: String, mode: PromptMode = .chat) throws {
         guard AXIsProcessTrusted() else { throw LaunchError.permission }
         let prompt = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let expected = normalize(prompt)
@@ -123,12 +132,12 @@ enum ClaudeLauncher {
                 Thread.sleep(forTimeInterval: 0.25)
                 seen = composers(app)
             }
-            if seen.contains(where: { isNewChat(pageURL(of: $0)) && !normalize(text($0, "AXValue")).isEmpty }) {
+            if seen.contains(where: { isNewPage(pageURL(of: $0), mode) && !normalize(text($0, "AXValue")).isEmpty }) {
                 throw LaunchError.draft
             }
         }
 
-        guard NSWorkspace.shared.open(link(for: prompt)) else { throw LaunchError.noComposer }
+        guard NSWorkspace.shared.open(link(for: prompt, mode: mode)) else { throw LaunchError.noComposer }
 
         var app: AXUIElement?
         var composer: AXUIElement?
@@ -136,7 +145,7 @@ enum ClaudeLauncher {
         while Date() < deadline, composer == nil {
             if let a = runningApp() {
                 app = a
-                composer = composers(a).first { normalize(text($0, "AXValue")) == expected && isNewChat(pageURL(of: $0)) }
+                composer = composers(a).first { normalize(text($0, "AXValue")) == expected && isNewPage(pageURL(of: $0), mode) }
             }
             if composer == nil { Thread.sleep(forTimeInterval: 0.25) }
         }

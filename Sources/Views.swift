@@ -66,6 +66,8 @@ struct MainView: View {
     var onReview: (String) -> Void
     var onClose: () -> Void
     @State private var recipient: Member?
+    /// Dernier mode choisi, gardé d'un envoi à l'autre
+    @AppStorage("mode") private var mode: PromptMode = .chat
     @State private var text = ""
     @State private var sending = false
     @State private var trusted = AXIsProcessTrusted()
@@ -101,6 +103,7 @@ struct MainView: View {
                             Text(p.summary).font(.system(size: 12)).foregroundStyle(Glass.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 4)
+                        ModeTag(mode: p.launchMode)
                         Button("Regarder") { onReview(p.id) }.buttonStyle(GlassButton())
                     }
                     .glassCard(padding: 10)
@@ -109,6 +112,8 @@ struct MainView: View {
 
             label("Envoyer un prompt")
             Pills(items: store.others.map(Optional.some), selection: $recipient) { $0?.name ?? "" }
+            label("Lancé dans")
+            Pills(items: PromptMode.allCases, selection: $mode) { $0.label }
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
                     .font(.system(size: 13))
@@ -136,7 +141,7 @@ struct MainView: View {
                     guard let recipient else { return }
                     sending = true
                     Task {
-                        if await store.send(to: recipient, text: text) { text = "" }
+                        if await store.send(to: recipient, text: text, mode: mode) { text = "" }
                         sending = false
                     }
                 }
@@ -207,9 +212,13 @@ struct ReviewView: View {
             GlassHeader(title: p.map { store.name($0.sender_id) } ?? "Prompt") {
                 SquareButton(icon: "xmark", action: onClose)
             }
-            Text(p?.summary ?? "Prompt introuvable")
-                .font(.system(size: 12))
-                .foregroundStyle(Glass.secondary)
+            HStack(spacing: 8) {
+                Text(p?.summary ?? "Prompt introuvable")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Glass.secondary)
+                Spacer(minLength: 4)
+                if let p { ModeTag(mode: p.launchMode, always: true) }
+            }
             ScrollView {
                 Text(p?.body ?? "")
                     .font(.system(size: 13))
@@ -249,6 +258,17 @@ struct ReviewView: View {
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity)
         .overlay(alignment: .bottomTrailing) { ResizeGrip() }
         .glassWindow()
+    }
+}
+
+/// « Claude Code » (ou « Claude » si always) : où le prompt sera lancé
+struct ModeTag: View {
+    let mode: PromptMode
+    var always = false
+    var body: some View {
+        if mode == .code || always {
+            StatusTag(text: mode.label, color: mode == .code ? Glass.orange : .white.opacity(0.6))
+        }
     }
 }
 

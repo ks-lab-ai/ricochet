@@ -1,6 +1,6 @@
 # Ricochet
 
-Envoyez un prompt à un collègue depuis la barre de menus de votre Mac. Il reçoit une notification, le regarde, et d'un clic le lance dans une nouvelle conversation de son Claude Desktop. Vous êtes prévenu quand il l'a lancé ou refusé.
+Envoyez un prompt à un collègue depuis la barre de menus de votre Mac. Il reçoit une notification, le regarde, et d’un clic le lance dans son Claude Desktop, dans Claude ou dans Claude Code selon votre choix. Vous êtes prévenu quand il l'a lancé ou refusé.
 
 ## Installation
 
@@ -28,7 +28,8 @@ Ricochet s'ajoute à l'ouverture de session, car il doit tourner pour recevoir l
 
 ## Utilisation
 
-- **Envoyer :** cliquez sur l'étoile dans la barre de menus, choisissez un destinataire, écrivez, puis `Cmd + Entrée`.
+- **Envoyer :** cliquez sur l'étoile dans la barre de menus, choisissez un destinataire, puis où le prompt sera lancé : **Claude** (onglet Chat) ou **Claude Code** (onglet Code). Écrivez, puis `Cmd + Entrée`.
+- **Claude ou Claude Code :** au lancement, Claude Desktop bascule tout seul sur le bon onglet en haut à gauche, puis envoie le prompt. En mode Claude Code, la session s'ouvre dans le dernier dossier de travail choisi par le destinataire.
 - **Recevoir :** la notification indique l'expéditeur et un résumé en 3 mots. **Regarder** ouvre le prompt complet avec **Lancer** et **Refuser**. **Lancer** l'exécute directement.
 
 Prenez l'habitude de regarder avant de lancer : le prompt s'exécute avec votre compte Claude, vos connecteurs et vos réglages. L'app Claude affiche elle-même un avertissement pour les prompts reçus par lien, et le lancement automatique le fait passer sans que vous le lisiez.
@@ -52,7 +53,7 @@ claude mcp add --scope user ricochet -- node "$(pwd)/mcp/server/index.js"
 | Outil | Rôle |
 |---|---|
 | `list_team` | Voir les membres de l'équipe |
-| `send_prompt` | Envoyer un prompt à un collègue |
+| `send_prompt` | Envoyer un prompt à un collègue, avec `mode` : `claude` (par défaut) ou `claude_code` |
 | `list_sent` | Voir ses envois et leur statut |
 | `list_received` | Voir les prompts reçus en attente |
 
@@ -72,11 +73,19 @@ Aucun outil ne peut lancer ou refuser un prompt, et c'est volontaire : sinon, un
 git pull && ./install.sh
 ```
 
+Puis réinstallez l'extension de Claude Desktop pour avoir les dernières options du MCP :
+
+```bash
+open mcp/ricochet.mcpb
+```
+
+Si vous recevez un prompt prévu pour Claude Code avec une ancienne version, il s'ouvre simplement dans l'onglet Chat.
+
 Chaque compilation change la signature locale de l'app : macOS redemande alors l'autorisation Accessibilité, et il suffit de réactiver Ricochet.
 
 ## Sécurité
 
-Ce dépôt est public et contient l'adresse du projet Supabase et sa clé publishable, prévue pour être diffusée. La protection repose sur les règles de la base ([001_schema.sql](supabase/migrations/001_schema.sql)) :
+Ce dépôt est public et contient l'adresse du projet Supabase et sa clé publishable, prévue pour être diffusée. La protection repose sur les règles de la base ([001_schema.sql](supabase/migrations/001_schema.sql), puis [002_mode.sql](supabase/migrations/002_mode.sql)) :
 
 - sans le code d'équipe, un compte ne voit et n'écrit rien ;
 - un prompt n'est visible que par son expéditeur et son destinataire ;

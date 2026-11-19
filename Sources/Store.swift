@@ -76,13 +76,13 @@ final class Store: ObservableObject {
         }
     }
 
-    func send(to recipient: Member, text: String) async -> Bool {
+    func send(to recipient: Member, text: String, mode: PromptMode) async -> Bool {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else { return false }
         do {
             let summary = await Summarizer.summarize(body)
-            try await api.sendPrompt(to: recipient.id, body: body, summary: summary)
-            message = "Envoyé à \(recipient.name) : \(summary)"
+            try await api.sendPrompt(to: recipient.id, body: body, summary: summary, mode: mode)
+            message = "Envoyé à \(recipient.name) pour \(mode.label) : \(summary)"
             await refresh()
             return true
         } catch {
@@ -97,6 +97,7 @@ final class Store: ObservableObject {
         launching = id
         defer { launching = nil }
         let text = p.body
+        let mode = p.launchMode
         if !AXIsProcessTrusted() {
             Permissions.openSettings()
             message = "Activez Ricochet dans les réglages : le prompt partira tout seul."
@@ -115,7 +116,7 @@ final class Store: ObservableObject {
             message = nil
         }
         do {
-            try await Task.detached { try ClaudeLauncher.launch(text) }.value
+            try await Task.detached { try ClaudeLauncher.launch(text, mode: mode) }.value
         } catch {
             fail(error.localizedDescription, promptID: id)
             return
@@ -158,7 +159,7 @@ final class Store: ObservableObject {
             if p.recipient_id == meID, p.status == "pending" {
                 let c = UNMutableNotificationContent()
                 c.title = "\(name(p.sender_id)) vous a envoyé un prompt à exécuter"
-                c.body = p.summary
+                c.body = p.launchMode == .code ? "\(p.summary) · Claude Code" : p.summary
                 c.categoryIdentifier = AppDelegate.promptCategory
                 c.userInfo = ["prompt": p.id]
                 c.sound = .default

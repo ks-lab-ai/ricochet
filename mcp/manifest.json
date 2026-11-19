@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "ricochet",
   "display_name": "Ricochet",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Envoyez un prompt à un collègue depuis Claude. Il le lance ou le refuse d'un clic.",
   "long_description": "Demandez à Claude d'envoyer un prompt à un membre de votre équipe, et suivez son statut. Le destinataire reçoit une notification et décide lui-même : aucun outil ne peut lancer ou refuser un prompt à sa place. Nécessite l'app Ricochet sur ce Mac, dont la session est réutilisée : aucune clé à configurer.",
   "author": {
@@ -25,7 +25,7 @@
   },
   "tools": [
     { "name": "list_team", "description": "Voir les membres de l'équipe." },
-    { "name": "send_prompt", "description": "Envoyer un prompt à un collègue, qui décide de le lancer." },
+    { "name": "send_prompt", "description": "Envoyer un prompt à un collègue, à lancer dans Claude ou Claude Code." },
     { "name": "list_sent", "description": "Voir ses envois et leur statut." },
     { "name": "list_received", "description": "Voir les prompts reçus en attente." }
   ],

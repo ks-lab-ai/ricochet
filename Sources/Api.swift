@@ -14,6 +14,12 @@ struct Member: Codable, Identifiable, Hashable {
     let name: String
 }
 
+/// Où le prompt est lancé chez le destinataire : onglet Chat ou onglet Code de Claude Desktop
+enum PromptMode: String, Codable, CaseIterable, Hashable {
+    case chat, code
+    var label: String { self == .code ? "Claude Code" : "Claude" }
+}
+
 struct Prompt: Codable, Identifiable, Hashable {
     let id: String
     let sender_id: String
@@ -22,6 +28,10 @@ struct Prompt: Codable, Identifiable, Hashable {
     let summary: String
     let status: String
     let created_at: String
+    /// Absent des prompts envoyés par une ancienne version : Claude par défaut
+    let mode: String?
+
+    var launchMode: PromptMode { PromptMode(rawValue: mode ?? "") ?? .chat }
 }
 
 struct Session: Codable {
@@ -144,15 +154,16 @@ actor Api {
     func prompts() async throws -> [Prompt] {
         let d = try await send(
             "GET",
-            "/rest/v1/prompts?select=id,sender_id,recipient_id,body,summary,status,created_at&order=created_at.desc&limit=100",
+            "/rest/v1/prompts?select=id,sender_id,recipient_id,body,summary,status,created_at,mode&order=created_at.desc&limit=100",
             token: try await token())
         return try JSONDecoder().decode([Prompt].self, from: d)
     }
 
-    func sendPrompt(to recipient: String, body: String, summary: String) async throws {
+    func sendPrompt(to recipient: String, body: String, summary: String, mode: PromptMode) async throws {
         guard let me = session?.member_id else { throw ApiError.sessionLost }
         _ = try await send("POST", "/rest/v1/prompts",
-                           body: ["sender_id": me, "recipient_id": recipient, "body": body, "summary": summary],
+                           body: ["sender_id": me, "recipient_id": recipient, "body": body, "summary": summary,
+                                  "mode": mode.rawValue],
                            token: try await token())
     }
 
