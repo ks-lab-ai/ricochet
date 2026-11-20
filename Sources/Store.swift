@@ -92,12 +92,13 @@ final class Store: ObservableObject {
     }
 
     /// Lance le prompt dans Claude, et ne prévient l'expéditeur qu'une fois l'envoi confirmé.
-    func launch(_ id: String) async {
+    /// mode : choix du destinataire au moment de lancer (sinon celui de l'expéditeur)
+    func launch(_ id: String, mode chosen: PromptMode? = nil) async {
         guard launching == nil, let p = prompt(id), p.status == "pending", p.recipient_id == meID else { return }
         launching = id
         defer { launching = nil }
         let text = p.body
-        let mode = p.launchMode
+        let mode = chosen ?? p.launchMode
         if !AXIsProcessTrusted() {
             Permissions.openSettings()
             message = "Activez Ricochet dans les réglages : le prompt partira tout seul."

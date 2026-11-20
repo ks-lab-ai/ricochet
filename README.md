@@ -30,6 +30,7 @@ Ricochet s'ajoute à l'ouverture de session, car il doit tourner pour recevoir l
 
 - **Envoyer :** cliquez sur l'étoile dans la barre de menus, choisissez un destinataire, puis où le prompt sera lancé : **Claude** (onglet Chat) ou **Claude Code** (onglet Code). Écrivez, puis `Cmd + Entrée`.
 - **Claude ou Claude Code :** au lancement, Claude Desktop bascule tout seul sur le bon onglet en haut à gauche, puis envoie le prompt. En mode Claude Code, la session s'ouvre dans le dernier dossier de travail choisi par le destinataire.
+- **Changer d'avis à la réception :** dans la fenêtre du prompt reçu, le sélecteur **Claude / Claude Code** en haut à droite permet de le lancer ailleurs que prévu par l'expéditeur. Le choix ne vaut que pour ce lancement.
 - **Recevoir :** la notification indique l'expéditeur et un résumé en 3 mots. **Regarder** ouvre le prompt complet avec **Lancer** et **Refuser**. **Lancer** l'exécute directement.
 
 Prenez l'habitude de regarder avant de lancer : le prompt s'exécute avec votre compte Claude, vos connecteurs et vos réglages. L'app Claude affiche elle-même un avertissement pour les prompts reçus par lien, et le lancement automatique le fait passer sans que vous le lisiez.

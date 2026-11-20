@@ -214,6 +214,8 @@ struct ReviewView: View {
     @ObservedObject var store: Store
     let promptID: String
     var onClose: () -> Void
+    /// Bascule à la volée entre Claude et Claude Code, sans toucher au choix de l'expéditeur
+    @State private var mode: PromptMode?
 
     var body: some View {
         let p = store.prompt(promptID)
@@ -226,7 +228,20 @@ struct ReviewView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Glass.secondary)
                 Spacer(minLength: 4)
-                if let p { ModeTag(mode: p.launchMode, always: true) }
+                if let p {
+                    if p.status == "pending" {
+                        ModeSwitch(selection: Binding(get: { mode ?? p.launchMode }, set: { mode = $0 }))
+                    } else {
+                        ModeTag(mode: p.launchMode, always: true)
+                    }
+                }
+            }
+            if let p, p.status == "pending", let m = mode, m != p.launchMode {
+                Text("\(store.name(p.sender_id)) l’avait prévu dans \(p.launchMode.label)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Glass.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .transition(.opacity)
             }
             ScrollView {
                 Text(p?.body ?? "")
@@ -254,7 +269,7 @@ struct ReviewView: View {
                 Button(store.launching == promptID ? "Lancement…" : "Lancer") {
                     store.message = nil
                     Task {
-                        await store.launch(promptID)
+                        await store.launch(promptID, mode: mode)
                         if store.prompt(promptID)?.status != "pending" { onClose() }
                     }
                 }
@@ -267,6 +282,45 @@ struct ReviewView: View {
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity)
         .overlay(alignment: .bottomTrailing) { ResizeGrip() }
         .glassWindow()
+    }
+}
+
+/// Petit sélecteur Claude / Claude Code de la fenêtre Regarder, orange quand c'est Claude Code
+struct ModeSwitch: View {
+    @Binding var selection: PromptMode
+    @Namespace private var ns
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(PromptMode.allCases, id: \.self) { m in
+                let on = m == selection
+                let tint: Color = m == .code ? Glass.orange : .white
+                Button {
+                    withAnimation(Glass.spring) { selection = m }
+                } label: {
+                    Text(m.label)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(on ? tint : .white.opacity(0.45))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 8)
+                        .frame(height: 20)
+                        .background {
+                            if on {
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(tint.opacity(m == .code ? 0.2 : 0.14))
+                                    .matchedGeometryEffect(id: "mode", in: ns)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .handCursor()
+                .help(m == .code ? "Lancer dans l’onglet Code de Claude Desktop" : "Lancer dans une conversation Claude")
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(.white.opacity(0.06)))
     }
 }
 
